@@ -11,19 +11,18 @@ from bs4 import BeautifulSoup
 
 app = FastAPI()
 
-# ---- CORS (allow GitHub Pages + local) ----
+# CORS (allow all for now)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TEMP: allow all for now
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---- CONFIG ----
 GOOGLE_CLIENT_ID = "996613039990-0trnr1a3dh4l5aevo57hci9v4mnc1ock.apps.googleusercontent.com"
 
-# ---- DATABASE ----
+# Database
 conn = sqlite3.connect("app.db", check_same_thread=False)
 cur = conn.cursor()
 
@@ -38,14 +37,14 @@ CREATE TABLE IF NOT EXISTS favorites (
 """)
 conn.commit()
 
-# ---- MODELS ----
+# Models
 class LoginRequest(BaseModel):
     id_token: str
 
 class FavoriteRequest(BaseModel):
-    url: str
+    url: str   # <-- IMPORTANT: url, not product
 
-# ---- HELPERS ----
+# Helpers
 def verify_token(token: str):
     try:
         idinfo = id_token.verify_oauth2_token(
@@ -77,8 +76,7 @@ def scrape_flipkart(url: str):
 
     return {"title": title, "price": price, "image": image}
 
-# ---- ROUTES ----
-
+# Routes
 @app.post("/login")
 def login(data: LoginRequest):
     email = verify_token(data.id_token)

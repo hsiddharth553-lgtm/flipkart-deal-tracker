@@ -48,7 +48,7 @@ function addFavorite() {
   fetch(`${API_BASE}/favorite?token=${encodeURIComponent(idToken)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: url })
+    body: JSON.stringify({ url: url })   // <-- IMPORTANT: url
   })
     .then(res => {
       if (!res.ok) throw new Error("Add failed");
@@ -92,6 +92,8 @@ function removeFavorite(url) {
 // Render favorites
 function renderFavorites(list) {
   const grid = document.getElementById("favGrid");
+  if (!grid) return;
+
   grid.innerHTML = "";
 
   if (!list || list.length === 0) {
@@ -104,11 +106,13 @@ function renderFavorites(list) {
     card.className = "card";
 
     card.innerHTML = `
-      <img src="${item.image || ""}" />
+      <img src="${item.image || ""}" style="max-width:100%; height:200px; object-fit:contain;" />
       <div class="title">${item.title}</div>
       <div class="price">${item.price}</div>
       <a href="${item.url}" target="_blank">View on Flipkart</a>
-      <button onclick="removeFavorite(${JSON.stringify(item.url)})">Remove</button>
+      <div class="actions">
+        <button onclick="removeFavorite(${JSON.stringify(item.url)})">Remove</button>
+      </div>
     `;
 
     grid.appendChild(card);
