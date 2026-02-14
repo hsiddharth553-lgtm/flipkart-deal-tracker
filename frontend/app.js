@@ -1,56 +1,93 @@
-const API = "http://127.0.0.1:8000"; // backend
-let googleToken = null;
+let idToken = null;
 
+const API_BASE = "https://flipkart-deal-tracker.onrender.com";
+
+// Called by Google after login
 function handleLogin(response) {
-  googleToken = response.credential;
+  console.log("Google login response:", response);
 
-  fetch(API + "/login", {
+  idToken = response.credential;
+
+  fetch(`${API_BASE}/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id_token: googleToken })
-  })
-    .then(r => r.json())
-    .then(data => {
-      document.getElementById("userInfo").innerText = "Logged in as: " + data.email;
-      loadFavorites();
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      id_token: idToken
     })
-    .catch(err => {
-      console.error(err);
-      alert("Login failed. Check backend.");
-    });
+  })
+  .then(res => res.json())
+  .then(data => {
+    console.log("Login API response:", data);
+    const ui = document.getElementById("userInfo");
+    if (ui && data.email) {
+      ui.innerText = "Logged in as: " + data.email;
+    }
+    loadFavorites();
+  })
+  .catch(err => {
+    console.error("Login error:", err);
+  });
 }
 
+// Add favorite
 function addFavorite() {
-  const product = document.getElementById("product").value;
-
-  if (!googleToken) {
-    alert("Please login first!");
+  if (!idToken) {
+    alert("Please sign in first!");
     return;
   }
 
-  fetch(API + "/favorite?token=" + googleToken, {
+  const input = document.getElementById("product");
+  const product = input.value.trim();
+  if (!product) return;
+
+  fetch(`${API_BASE}/favorite?token=${idToken}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ product: product })
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ product })
   })
-    .then(() => {
-      document.getElementById("product").value = "";
-      loadFavorites();
-    });
+  .then(res => res.json())
+  .then(() => {
+    input.value = "";
+    loadFavorites();
+  })
+  .catch(err => console.error("Add favorite error:", err));
 }
 
+// Load favorites
 function loadFavorites() {
-  if (!googleToken) return;
+  if (!idToken) return;
 
-  fetch(API + "/favorites?token=" + googleToken)
-    .then(r => r.json())
-    .then(list => {
-      const ul = document.getElementById("favList");
-      ul.innerHTML = "";
-      list.forEach(p => {
-        const li = document.createElement("li");
-        li.innerText = p;
-        ul.appendChild(li);
-      });
-    });
+  fetch(`${API_BASE}/favorites?token=${idToken}`)
+    .then(res => res.json())
+    .then(data => {
+      console.log("Favorites:", data);
+      renderFavorites(data);
+    })
+    .catch(err => console.error("Load favorites error:", err));
+}
+
+// Render favorites as Flipkart-style cards
+function renderFavorites(list) {
+  const grid = document.getElementById("favGrid");
+  if (!grid) return;
+
+  grid.innerHTML = "";
+
+  list.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <div class="title">${item}</div>
+      <div class="actions">
+        <button class="remove" onclick="alert('Remove coming soon 😄')">Remove</button>
+      </div>
+    `;
+
+    grid.appendChild(card);
+  });
 }
