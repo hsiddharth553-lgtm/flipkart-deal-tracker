@@ -17,15 +17,12 @@ app = FastAPI()
 # CORS (allow GitHub Pages + local)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://hsiddharth553-lgtm.github.io",
-        "http://localhost:8001",
-        "http://127.0.0.1:8001",
-    ],
+    allow_origins=["*"],  # TEMP: allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ===== CONFIG =====
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
