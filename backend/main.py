@@ -95,3 +95,23 @@ def get_favorites(token: str):
         return [r[0] for r in rows]
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
+@app.delete("/favorite")
+def delete_favorite(token: str, product: str):
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            grequests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+        email = idinfo.get("email")
+
+        cur.execute(
+            "DELETE FROM favorites WHERE email = ? AND product = ?",
+            (email, product)
+        )
+        conn.commit()
+
+        return {"status": "deleted"}
+
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
