@@ -3,11 +3,13 @@ const API_BASE = "https://flipkart-deal-tracker.onrender.com";
 let idToken = null;
 let userEmail = null;
 
-// Called by Google when user logs in
+// Called by Google Sign-In
 function handleLogin(response) {
+  console.log("Google login response:", response);
+
   idToken = response.credential;
 
-  // Send token to backend to verify
+  // Verify token with backend
   fetch(`${API_BASE}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -27,27 +29,31 @@ function handleLogin(response) {
 
 // Add favorite
 function addFavorite() {
-  const product = document.getElementById("product").value.trim();
-  if (!product) {
-    alert("Enter product name or URL");
-    return;
-  }
   if (!idToken) {
     alert("Please sign in first!");
+    return;
+  }
+
+  const input = document.getElementById("product");
+  const product = input.value.trim();
+
+  if (!product) {
+    alert("Enter a product name or link!");
     return;
   }
 
   fetch(`${API_BASE}/favorite?token=${idToken}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ product: product })
+    body: JSON.stringify({ product })
   })
     .then(res => res.json())
-    .then(() => {
-      document.getElementById("product").value = "";
+    .then(data => {
+      console.log("Added:", data);
+      input.value = "";
       loadFavorites();
     })
-    .catch(err => console.error("Add favorite error:", err));
+    .catch(err => console.error("Add error:", err));
 }
 
 // Load favorites
@@ -56,28 +62,39 @@ function loadFavorites() {
 
   fetch(`${API_BASE}/favorites?token=${idToken}`)
     .then(res => res.json())
-    .then(items => {
-      const grid = document.getElementById("favGrid");
-      grid.innerHTML = "";
-
-      items.forEach(item => {
-        const card = document.createElement("div");
-        card.className = "card";
-
-        card.innerHTML = `
-          <div class="title">${item}</div>
-          <div class="actions">
-            <button class="remove" onclick="removeFavorite('${item.replace(/'/g, "\\'")}')">Remove</button>
-          </div>
-        `;
-
-        grid.appendChild(card);
-      });
+    .then(list => {
+      console.log("Favorites:", list);
+      renderFavorites(list);
     })
-    .catch(err => console.error("Load favorites error:", err));
+    .catch(err => console.error("Load error:", err));
 }
 
-// Remove favorite ✅
+// Render favorites with Remove button
+function renderFavorites(list) {
+  const grid = document.getElementById("favGrid");
+  if (!grid) return;
+
+  grid.innerHTML = "";
+
+  list.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <div class="title">${item}</div>
+      <div class="actions">
+        <button class="remove">Remove</button>
+      </div>
+    `;
+
+    const btn = card.querySelector(".remove");
+    btn.onclick = () => removeFavorite(item);
+
+    grid.appendChild(card);
+  });
+}
+
+// Remove favorite
 function removeFavorite(product) {
   if (!idToken) {
     alert("Please sign in first!");
@@ -88,8 +105,9 @@ function removeFavorite(product) {
     method: "DELETE"
   })
     .then(res => res.json())
-    .then(() => {
+    .then(data => {
+      console.log("Deleted:", data);
       loadFavorites(); // refresh list
     })
-    .catch(err => console.error("Remove favorite error:", err));
+    .catch(err => console.error("Remove error:", err));
 }
