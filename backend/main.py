@@ -11,15 +11,16 @@ from bs4 import BeautifulSoup
 
 app = FastAPI()
 
-# CORS (allow all for now)
+# ===== CORS =====
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # TEMP: allow all for now
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ===== CONFIG =====
 GOOGLE_CLIENT_ID = "996613039990-0trnr1a3dh4l5aevo57hci9v4mnc1ock.apps.googleusercontent.com"
 
 # ===== DATABASE =====
@@ -58,23 +59,30 @@ def verify_token(token: str):
 
 def scrape_flipkart(url: str):
     headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers, timeout=10)
+    r = requests.get(url, headers=headers, timeout=15)
 
     if r.status_code != 200:
-        raise HTTPException(status_code=400, detail="Failed to fetch product page")
+        raise HTTPException(status_code=400, detail="Failed to fetch Flipkart page")
 
     soup = BeautifulSoup(r.text, "html.parser")
 
+    # Title
     title_tag = soup.find("span", {"class": "B_NuCI"})
     title = title_tag.text.strip() if title_tag else "Unknown Product"
 
+    # Price
     price_tag = soup.find("div", {"class": "_30jeq3 _16Jk6d"})
     price = price_tag.text.strip() if price_tag else "N/A"
 
+    # Image
     img_tag = soup.find("img", {"class": "_396cs4"})
     image = img_tag["src"] if img_tag and img_tag.has_attr("src") else ""
 
-    return {"title": title, "price": price, "image": image}
+    return {
+        "title": title,
+        "price": price,
+        "image": image
+    }
 
 # ===== ROUTES =====
 
@@ -101,7 +109,7 @@ def add_favorite(
     return {"status": "ok"}
 
 @app.get("/favorites")
-def get_favorites(token: str = Query(...)):
+def get_favorites(token: str):
     email = verify_token(token)
 
     cur.execute(
@@ -116,7 +124,7 @@ def get_favorites(token: str = Query(...)):
     ]
 
 @app.delete("/favorite")
-def delete_favorite(token: str = Query(...), url: str = Query(...)):
+def delete_favorite(token: str, url: str):
     email = verify_token(token)
 
     cur.execute(
