@@ -4,25 +4,34 @@ const API_BASE = "https://flipkart-deal-tracker.onrender.com";
 
 // Called by Google after login
 function handleLogin(response) {
+  console.log("Google login response:", response);
+
   idToken = response.credential;
 
   fetch(`${API_BASE}/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id_token: idToken })
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      id_token: idToken
+    })
   })
     .then(res => res.json())
     .then(data => {
+      console.log("Login API response:", data);
       const ui = document.getElementById("userInfo");
       if (ui && data.email) {
         ui.innerText = "Logged in as: " + data.email;
       }
       loadFavorites();
     })
-    .catch(err => console.error("Login error:", err));
+    .catch(err => {
+      console.error("Login error:", err);
+    });
 }
 
-// Add favorite (expects Flipkart URL)
+// Add favorite (expects a Flipkart URL)
 function addFavorite() {
   if (!idToken) {
     alert("Please sign in first!");
@@ -31,15 +40,32 @@ function addFavorite() {
 
   const input = document.getElementById("product");
   const url = input.value.trim();
-  if (!url) return;
 
-  fetch(`${API_BASE}/favorite?token=${idToken}`, {
+  if (!url) {
+    alert("Paste a Flipkart product link!");
+    return;
+  }
+
+  if (!url.includes("flipkart.com")) {
+    alert("Please paste a valid Flipkart product link.");
+    return;
+  }
+
+  fetch(`${API_BASE}/favorite?token=${encodeURIComponent(idToken)}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url })
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      url: url
+    })
   })
-    .then(res => res.json())
-    .then(() => {
+    .then(res => {
+      if (!res.ok) throw new Error("Add failed");
+      return res.json();
+    })
+    .then(data => {
+      console.log("Added:", data);
       input.value = "";
       loadFavorites();
     })
@@ -50,9 +76,12 @@ function addFavorite() {
 function loadFavorites() {
   if (!idToken) return;
 
-  fetch(`${API_BASE}/favorites?token=${idToken}`)
+  fetch(`${API_BASE}/favorites?token=${encodeURIComponent(idToken)}`)
     .then(res => res.json())
-    .then(data => renderFavorites(data))
+    .then(data => {
+      console.log("Favorites:", data);
+      renderFavorites(data);
+    })
     .catch(err => console.error("Load favorites error:", err));
 }
 
@@ -60,10 +89,16 @@ function loadFavorites() {
 function removeFavorite(url) {
   if (!idToken) return;
 
-  fetch(`${API_BASE}/favorite?token=${idToken}&url=${encodeURIComponent(url)}`, {
+  fetch(`${API_BASE}/favorite?token=${encodeURIComponent(idToken)}&url=${encodeURIComponent(url)}`, {
     method: "DELETE"
   })
-    .then(() => loadFavorites())
+    .then(res => {
+      if (!res.ok) throw new Error("Delete failed");
+      return res.json();
+    })
+    .then(() => {
+      loadFavorites();
+    })
     .catch(err => console.error("Delete error:", err));
 }
 
@@ -74,18 +109,22 @@ function renderFavorites(list) {
 
   grid.innerHTML = "";
 
+  if (!list || list.length === 0) {
+    grid.innerHTML = "<p>No products added yet.</p>";
+    return;
+  }
+
   list.forEach(item => {
     const card = document.createElement("div");
     card.className = "card";
 
     card.innerHTML = `
-      <img src="${item.image}" alt="" style="max-width:150px;">
-      <h3>${item.title}</h3>
-      <p><b>Price:</b> ${item.price}</p>
-      <p style="text-decoration: line-through; color: gray;">${item.mrp || ""}</p>
+      <img src="${item.image || ""}" alt="Product Image" style="max-width:100%; height:200px; object-fit:contain;" />
+      <div class="title">${item.title}</div>
+      <div class="price">${item.price}</div>
+      <a href="${item.url}" target="_blank">View on Flipkart</a>
       <div class="actions">
-        <a href="${item.url}" target="_blank">Open on Flipkart</a>
-        <button onclick="removeFavorite('${item.url.replace(/'/g, "\\'")}')">Remove</button>
+        <button onclick="removeFavorite(${JSON.stringify(item.url)})">Remove</button>
       </div>
     `;
 
