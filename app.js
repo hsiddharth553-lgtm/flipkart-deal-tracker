@@ -70,7 +70,7 @@ function loadFavorites() {
     .catch(err => console.error("Load favorites error:", err));
 }
 
-// Render favorites as Flipkart-style cards
+// Render favorites
 function renderFavorites(list) {
   const grid = document.getElementById("favGrid");
   if (!grid) return;

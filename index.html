@@ -12,7 +12,6 @@
 </head>
 <body>
 
-    <!-- Top Bar -->
     <header class="topbar">
         <div class="logo">🛒 Flipkart Deal Tracker</div>
 
@@ -25,22 +24,14 @@
             <span id="userInfo">Not logged in</span>
 
             <div id="g_id_onload"
-                 data-client_id="996613039990-0trnr1a3dh4l5aevo57hci9v4mnc1ock.apps.googleusercontent.com"
-                 data-callback="handleLogin"
-                 data-auto_prompt="false">
+                 data-client_id="YOUR_GOOGLE_CLIENT_ID_HERE"
+                 data-callback="handleLogin">
             </div>
 
-            <div class="g_id_signin"
-                 data-type="standard"
-                 data-size="large"
-                 data-theme="outline"
-                 data-text="sign_in_with"
-                 data-shape="rectangular">
-            </div>
+            <div class="g_id_signin"></div>
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="container">
         <h2>Your Favorites</h2>
         <div id="favGrid" class="grid"></div>

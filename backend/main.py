@@ -2,6 +2,7 @@
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import sqlite3
+import os
 
 # Google token verification
 from google.oauth2 import id_token
@@ -9,18 +10,20 @@ from google.auth.transport import requests as grequests
 
 app = FastAPI()
 
-# CORS (allow frontend)
+# ===== CORS (ALLOW GITHUB PAGES + LOCAL) =====
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8001", "http://localhost:8001"],
+    allow_origins=[
+        "https://hsiddharth553-lgtm.github.io",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ===== CONFIG =====
-import os
-
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 if not GOOGLE_CLIENT_ID:
     raise RuntimeError("GOOGLE_CLIENT_ID is not set")
@@ -30,21 +33,11 @@ conn = sqlite3.connect("app.db", check_same_thread=False)
 cur = conn.cursor()
 
 cur.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE,
-    name TEXT
-)
-""")
-
-cur.execute("""
 CREATE TABLE IF NOT EXISTS favorites (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_email TEXT,
+    email TEXT,
     product TEXT
 )
 """)
-
 conn.commit()
 
 # ===== MODELS =====
@@ -54,50 +47,51 @@ class LoginRequest(BaseModel):
 class FavoriteRequest(BaseModel):
     product: str
 
-# ===== GOOGLE TOKEN VERIFY =====
-def verify_google_token(token: str):
+# ===== ROUTES =====
+
+@app.post("/login")
+def login(data: LoginRequest):
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            data.id_token,
+            grequests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+        email = idinfo.get("email")
+        return {"email": email}
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+@app.post("/favorite")
+def add_favorite(token: str, data: FavoriteRequest):
     try:
         idinfo = id_token.verify_oauth2_token(
             token,
             grequests.Request(),
             GOOGLE_CLIENT_ID
         )
-        return idinfo
-    except Exception as e:
-        print("Google token verify error:", e)
-        raise HTTPException(status_code=401, detail="Invalid Google token")
+        email = idinfo.get("email")
 
-# ===== ROUTES =====
+        cur.execute("INSERT INTO favorites (email, product) VALUES (?, ?)", (email, data.product))
+        conn.commit()
 
-@app.post("/login")
-def login(req: LoginRequest):
-    info = verify_google_token(req.id_token)
-
-    email = info["email"]
-    name = info.get("name", "")
-
-    cur.execute("INSERT OR IGNORE INTO users (email, name) VALUES (?, ?)", (email, name))
-    conn.commit()
-
-    return {"email": email, "name": name}
-
-@app.post("/favorite")
-def add_favorite(req: FavoriteRequest, token: str):
-    info = verify_google_token(token)
-    email = info["email"]
-
-    cur.execute("INSERT INTO favorites (user_email, product) VALUES (?, ?)", (email, req.product))
-    conn.commit()
-
-    return {"status": "ok"}
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 @app.get("/favorites")
 def get_favorites(token: str):
-    info = verify_google_token(token)
-    email = info["email"]
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            grequests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+        email = idinfo.get("email")
 
-    cur.execute("SELECT product FROM favorites WHERE user_email = ?", (email,))
-    rows = cur.fetchall()
+        cur.execute("SELECT product FROM favorites WHERE email = ?", (email,))
+        rows = cur.fetchall()
 
-    products = [r[0] for r in rows]
-    return products
+        return [r[0] for r in rows]
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
