@@ -20,10 +20,17 @@ function handleLogin(response) {
   .then(res => res.json())
   .then(data => {
     console.log("Login API response:", data);
+
+    // ✅ FIX: Update UI properly
     const ui = document.getElementById("userInfo");
-    if (ui && data.email) {
-      ui.innerText = "Logged in as: " + data.email;
+    if (ui) {
+      if (data.email) {
+        ui.innerText = "Logged in as: " + data.email;
+      } else {
+        ui.innerText = "Logged in";
+      }
     }
+
     loadFavorites();
   })
   .catch(err => {
