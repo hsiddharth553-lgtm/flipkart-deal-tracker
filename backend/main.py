@@ -17,12 +17,15 @@ app = FastAPI()
 # CORS (allow GitHub Pages + local)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TEMP: allow all origins
+    allow_origins=[
+        "https://hsiddharth553-lgtm.github.io",
+        "http://localhost:8001",
+        "http://127.0.0.1:8001",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # ===== CONFIG =====
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -53,12 +56,10 @@ class FavoriteRequest(BaseModel):
 
 # ===== HELPERS =====
 def scrape_flipkart(url: str):
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-    r = requests.get(url, headers=headers, timeout=10)
+    headers = {"User-Agent": "Mozilla/5.0"}
+    r = requests.get(url, headers=headers, timeout=15)
     if r.status_code != 200:
-        raise Exception("Failed to fetch product page")
+        raise HTTPException(status_code=400, detail="Failed to fetch product page")
 
     soup = BeautifulSoup(r.text, "html.parser")
 
