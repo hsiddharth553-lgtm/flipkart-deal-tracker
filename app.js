@@ -2,6 +2,7 @@ let idToken = null;
 
 const API_BASE = "https://flipkart-deal-tracker.onrender.com";
 
+// Called by Google after login
 function handleLogin(response) {
   console.log("Google login response:", response);
 
@@ -24,6 +25,7 @@ function handleLogin(response) {
     .catch(err => console.error("Login error:", err));
 }
 
+// Add favorite
 function addFavorite() {
   if (!idToken) {
     alert("Please sign in first!");
@@ -59,6 +61,7 @@ function addFavorite() {
     .catch(err => console.error("Add favorite error:", err));
 }
 
+// Load favorites
 function loadFavorites() {
   if (!idToken) return;
 
@@ -71,14 +74,22 @@ function loadFavorites() {
     .catch(err => console.error("Load favorites error:", err));
 }
 
+// Remove favorite
 function removeFavorite(url) {
+  if (!idToken) return;
+
   fetch(`${API_BASE}/favorite?token=${encodeURIComponent(idToken)}&url=${encodeURIComponent(url)}`, {
     method: "DELETE"
   })
+    .then(res => {
+      if (!res.ok) throw new Error("Delete failed");
+      return res.json();
+    })
     .then(() => loadFavorites())
     .catch(err => console.error("Delete error:", err));
 }
 
+// Render favorites
 function renderFavorites(list) {
   const grid = document.getElementById("favGrid");
   grid.innerHTML = "";
@@ -93,7 +104,7 @@ function renderFavorites(list) {
     card.className = "card";
 
     card.innerHTML = `
-      <img src="${item.image}" />
+      <img src="${item.image || ""}" />
       <div class="title">${item.title}</div>
       <div class="price">${item.price}</div>
       <a href="${item.url}" target="_blank">View on Flipkart</a>
