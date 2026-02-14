@@ -1,23 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Flipkart Deal Tracker</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <!-- Google Sign-In -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
     <!-- Top Bar -->
     <header class="topbar">
         <div class="logo">🛒 Flipkart Deal Tracker</div>
 
         <div class="search-box">
-            <input id="product" placeholder="Search for products, brands and more..." />
+            <input id="product" placeholder="Paste Flipkart link or product name..." />
             <button onclick="addFavorite()">Add</button>
         </div>
 
@@ -26,8 +25,7 @@
 
             <div id="g_id_onload"
                  data-client_id="996613039990-0trnr1a3dh4l5aevo57hci9v4mnc1ock.apps.googleusercontent.com"
-                 data-callback="handleLogin">
-            </div>
+                 data-callback="handleLogin"></div>
 
             <div class="g_id_signin"></div>
         </div>

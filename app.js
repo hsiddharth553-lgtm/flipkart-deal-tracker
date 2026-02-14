@@ -1,15 +1,11 @@
+let idToken = null;
+
 const API_BASE = "https://flipkart-deal-tracker.onrender.com";
 
-let idToken = null;
-let userEmail = null;
-
-// Called by Google Sign-In
+// Called by Google after login
 function handleLogin(response) {
-  console.log("Google login response:", response);
-
   idToken = response.credential;
 
-  // Verify token with backend
   fetch(`${API_BASE}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -17,17 +13,16 @@ function handleLogin(response) {
   })
     .then(res => res.json())
     .then(data => {
-      userEmail = data.email;
-      document.getElementById("userInfo").innerText = "Logged in as: " + userEmail;
+      const ui = document.getElementById("userInfo");
+      if (ui && data.email) {
+        ui.innerText = "Logged in as: " + data.email;
+      }
       loadFavorites();
     })
-    .catch(err => {
-      console.error("Login error:", err);
-      alert("Login failed");
-    });
+    .catch(err => console.error("Login error:", err));
 }
 
-// Add favorite (expects a Flipkart URL)
+// Add favorite (expects Flipkart URL)
 function addFavorite() {
   if (!idToken) {
     alert("Please sign in first!");
@@ -36,11 +31,7 @@ function addFavorite() {
 
   const input = document.getElementById("product");
   const url = input.value.trim();
-
-  if (!url) {
-    alert("Paste a Flipkart product link!");
-    return;
-  }
+  if (!url) return;
 
   fetch(`${API_BASE}/favorite?token=${idToken}`, {
     method: "POST",
@@ -48,15 +39,11 @@ function addFavorite() {
     body: JSON.stringify({ url })
   })
     .then(res => res.json())
-    .then(data => {
-      console.log("Added:", data);
+    .then(() => {
       input.value = "";
       loadFavorites();
     })
-    .catch(err => {
-      console.error("Add error:", err);
-      alert("Failed to add product");
-    });
+    .catch(err => console.error("Add favorite error:", err));
 }
 
 // Load favorites
@@ -65,74 +52,43 @@ function loadFavorites() {
 
   fetch(`${API_BASE}/favorites?token=${idToken}`)
     .then(res => res.json())
-    .then(list => {
-      console.log("Favorites:", list);
-      renderFavorites(list);
-    })
-    .catch(err => console.error("Load error:", err));
+    .then(data => renderFavorites(data))
+    .catch(err => console.error("Load favorites error:", err));
 }
 
-// Render favorites as product cards
+// Remove favorite
+function removeFavorite(url) {
+  if (!idToken) return;
+
+  fetch(`${API_BASE}/favorite?token=${idToken}&url=${encodeURIComponent(url)}`, {
+    method: "DELETE"
+  })
+    .then(() => loadFavorites())
+    .catch(err => console.error("Delete error:", err));
+}
+
+// Render favorites as cards
 function renderFavorites(list) {
   const grid = document.getElementById("favGrid");
   if (!grid) return;
 
   grid.innerHTML = "";
 
-  if (list.length === 0) {
-    grid.innerHTML = "<p>No products added yet.</p>";
-    return;
-  }
-
   list.forEach(item => {
     const card = document.createElement("div");
     card.className = "card";
 
-    const oldPriceHtml = item.old_price
-      ? `<span class="old-price">${item.old_price}</span>`
-      : "";
-
     card.innerHTML = `
-      <div class="product-card">
-        <div class="image-wrap">
-          ${item.image ? `<img src="${item.image}" alt="Product">` : ""}
-        </div>
-        <div class="info">
-          <div class="title">${item.title}</div>
-          <div class="prices">
-            <span class="price">${item.price}</span>
-            ${oldPriceHtml}
-          </div>
-          <div class="actions">
-            <a href="${item.url}" target="_blank" class="open-btn">Open</a>
-            <button class="remove-btn">Remove</button>
-          </div>
-        </div>
+      <img src="${item.image}" alt="" style="max-width:150px;">
+      <h3>${item.title}</h3>
+      <p><b>Price:</b> ${item.price}</p>
+      <p style="text-decoration: line-through; color: gray;">${item.mrp || ""}</p>
+      <div class="actions">
+        <a href="${item.url}" target="_blank">Open on Flipkart</a>
+        <button onclick="removeFavorite('${item.url.replace(/'/g, "\\'")}')">Remove</button>
       </div>
     `;
 
-    // Hook remove button
-    const removeBtn = card.querySelector(".remove-btn");
-    removeBtn.onclick = () => removeFavorite(item.url);
-
     grid.appendChild(card);
   });
-}
-
-// Remove favorite
-function removeFavorite(url) {
-  if (!idToken) {
-    alert("Please sign in first!");
-    return;
-  }
-
-  fetch(`${API_BASE}/favorite?token=${idToken}&url=${encodeURIComponent(url)}`, {
-    method: "DELETE"
-  })
-    .then(res => res.json())
-    .then(data => {
-      console.log("Deleted:", data);
-      loadFavorites(); // refresh list
-    })
-    .catch(err => console.error("Remove error:", err));
 }
