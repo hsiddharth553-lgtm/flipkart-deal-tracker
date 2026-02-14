@@ -6,31 +6,31 @@ import os
 import requests
 from bs4 import BeautifulSoup
 
-# Google token verification
+# Google auth
 from google.oauth2 import id_token
 from google.auth.transport import requests as grequests
 
 app = FastAPI()
 
-# ========== CORS ==========
+# CORS (allow your GitHub Pages + local)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://hsiddharth553-lgtm.github.io",
         "http://127.0.0.1:5500",
         "http://localhost:5500",
-        "https://hsiddharth553-lgtm.github.io"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ========== CONFIG ==========
+# ===== CONFIG =====
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 if not GOOGLE_CLIENT_ID:
     raise RuntimeError("GOOGLE_CLIENT_ID is not set")
 
-# ========== DATABASE ==========
+# ===== DATABASE =====
 conn = sqlite3.connect("app.db", check_same_thread=False)
 cur = conn.cursor()
 
@@ -38,130 +38,121 @@ cur.execute("""
 CREATE TABLE IF NOT EXISTS favorites (
     email TEXT,
     title TEXT,
+    url TEXT,
     image TEXT,
     price TEXT,
-    old_price TEXT,
-    url TEXT
+    mrp TEXT
 )
 """)
 conn.commit()
 
-# ========== MODELS ==========
+# ===== MODELS =====
 class LoginRequest(BaseModel):
     id_token: str
 
 class FavoriteRequest(BaseModel):
     url: str
 
-# ========== HELPERS ==========
-def fetch_flipkart_data(url: str):
+# ===== HELPERS =====
+def scrape_flipkart(url: str):
     headers = {
         "User-Agent": "Mozilla/5.0"
     }
-    r = requests.get(url, headers=headers, timeout=10)
+    r = requests.get(url, headers=headers, timeout=15)
+    if r.status_code != 200:
+        raise Exception("Failed to fetch product page")
+
     soup = BeautifulSoup(r.text, "html.parser")
 
-    title_el = soup.select_one("span.B_NuCI")
-    price_el = soup.select_one("div._30jeq3")
-    old_price_el = soup.select_one("div._3I9_wc")
-    image_el = soup.select_one("img._396cs4")
+    # Title
+    title_tag = soup.find("span", {"class": "B_NuCI"})
+    title = title_tag.get_text(strip=True) if title_tag else "Unknown Product"
 
-    title = title_el.text.strip() if title_el else "Unknown product"
-    price = price_el.text.strip() if price_el else ""
-    old_price = old_price_el.text.strip() if old_price_el else ""
-    image = image_el["src"] if image_el else ""
+    # Image
+    img_tag = soup.find("img", {"class": "_396cs4"})
+    image = img_tag["src"] if img_tag and img_tag.has_attr("src") else ""
+
+    # Price
+    price_tag = soup.find("div", {"class": "_30jeq3 _16Jk6d"})
+    price = price_tag.get_text(strip=True) if price_tag else "N/A"
+
+    # MRP
+    mrp_tag = soup.find("div", {"class": "_3I9_wc _2p6lqe"})
+    mrp = mrp_tag.get_text(strip=True) if mrp_tag else ""
 
     return {
         "title": title,
-        "price": price,
-        "old_price": old_price,
         "image": image,
+        "price": price,
+        "mrp": mrp,
         "url": url
     }
 
-# ========== ROUTES ==========
+def verify_token(token: str):
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            grequests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+        return idinfo.get("email")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# ===== ROUTES =====
 
 @app.post("/login")
 def login(data: LoginRequest):
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            data.id_token,
-            grequests.Request(),
-            GOOGLE_CLIENT_ID
-        )
-        email = idinfo.get("email")
-        return {"email": email}
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    email = verify_token(data.id_token)
+    return {"email": email}
 
 @app.post("/favorite")
 def add_favorite(token: str, data: FavoriteRequest):
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            token,
-            grequests.Request(),
-            GOOGLE_CLIENT_ID
-        )
-        email = idinfo.get("email")
+    email = verify_token(token)
 
-        product = fetch_flipkart_data(data.url)
+    if "flipkart.com" not in data.url:
+        raise HTTPException(status_code=400, detail="Only Flipkart links supported")
 
-        cur.execute(
-            "INSERT INTO favorites (email, title, image, price, old_price, url) VALUES (?, ?, ?, ?, ?, ?)",
-            (email, product["title"], product["image"], product["price"], product["old_price"], product["url"])
-        )
-        conn.commit()
+    product = scrape_flipkart(data.url)
 
-        return {"status": "ok", "product": product}
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=400, detail="Failed to add product")
+    cur.execute(
+        "INSERT INTO favorites (email, title, url, image, price, mrp) VALUES (?, ?, ?, ?, ?, ?)",
+        (email, product["title"], product["url"], product["image"], product["price"], product["mrp"])
+    )
+    conn.commit()
+
+    return {"status": "ok", "product": product}
 
 @app.get("/favorites")
 def get_favorites(token: str):
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            token,
-            grequests.Request(),
-            GOOGLE_CLIENT_ID
-        )
-        email = idinfo.get("email")
+    email = verify_token(token)
 
-        cur.execute(
-            "SELECT title, image, price, old_price, url FROM favorites WHERE email = ?",
-            (email,)
-        )
-        rows = cur.fetchall()
+    cur.execute(
+        "SELECT title, url, image, price, mrp FROM favorites WHERE email = ?",
+        (email,)
+    )
+    rows = cur.fetchall()
 
-        return [
-            {
-                "title": r[0],
-                "image": r[1],
-                "price": r[2],
-                "old_price": r[3],
-                "url": r[4],
-            }
-            for r in rows
-        ]
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    result = []
+    for r in rows:
+        result.append({
+            "title": r[0],
+            "url": r[1],
+            "image": r[2],
+            "price": r[3],
+            "mrp": r[4],
+        })
+
+    return result
 
 @app.delete("/favorite")
 def delete_favorite(token: str, url: str):
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            token,
-            grequests.Request(),
-            GOOGLE_CLIENT_ID
-        )
-        email = idinfo.get("email")
+    email = verify_token(token)
 
-        cur.execute(
-            "DELETE FROM favorites WHERE email = ? AND url = ?",
-            (email, url)
-        )
-        conn.commit()
+    cur.execute(
+        "DELETE FROM favorites WHERE email = ? AND url = ?",
+        (email, url)
+    )
+    conn.commit()
 
-        return {"status": "deleted"}
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    return {"status": "deleted"}
