@@ -4,35 +4,24 @@ from pydantic import BaseModel
 import sqlite3
 import os
 
-# Google auth
 from google.oauth2 import id_token
 from google.auth.transport import requests as grequests
 
-# Scraping
 import requests
 from bs4 import BeautifulSoup
 
 app = FastAPI()
 
-# CORS (allow GitHub Pages + local)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://hsiddharth553-lgtm.github.io",
-        "http://localhost:8001",
-        "http://127.0.0.1:8001",
-    ],
+    allow_origins=["*"],  # TEMP allow all
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ===== CONFIG =====
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-if not GOOGLE_CLIENT_ID:
-    raise RuntimeError("GOOGLE_CLIENT_ID is not set")
+GOOGLE_CLIENT_ID = "996613039990-0trnr1a3dh4l5aevo57hci9v4mnc1ock.apps.googleusercontent.com"
 
-# ===== DATABASE =====
 conn = sqlite3.connect("app.db", check_same_thread=False)
 cur = conn.cursor()
 
@@ -47,39 +36,11 @@ CREATE TABLE IF NOT EXISTS favorites (
 """)
 conn.commit()
 
-# ===== MODELS =====
 class LoginRequest(BaseModel):
     id_token: str
 
 class FavoriteRequest(BaseModel):
     url: str
-
-# ===== HELPERS =====
-def scrape_flipkart(url: str):
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers, timeout=15)
-    if r.status_code != 200:
-        raise HTTPException(status_code=400, detail="Failed to fetch product page")
-
-    soup = BeautifulSoup(r.text, "html.parser")
-
-    # Title
-    title_tag = soup.find("span", {"class": "B_NuCI"})
-    title = title_tag.text.strip() if title_tag else "Unknown Product"
-
-    # Price
-    price_tag = soup.find("div", {"class": "_30jeq3 _16Jk6d"})
-    price = price_tag.text.strip() if price_tag else "N/A"
-
-    # Image
-    img_tag = soup.find("img", {"class": "_396cs4"})
-    image = img_tag["src"] if img_tag and img_tag.has_attr("src") else ""
-
-    return {
-        "title": title,
-        "price": price,
-        "image": image
-    }
 
 def verify_token(token: str):
     try:
@@ -92,7 +53,21 @@ def verify_token(token: str):
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# ===== ROUTES =====
+def scrape_flipkart(url: str):
+    headers = {"User-Agent": "Mozilla/5.0"}
+    r = requests.get(url, headers=headers, timeout=10)
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    title_tag = soup.find("span", {"class": "B_NuCI"})
+    title = title_tag.text.strip() if title_tag else "Unknown Product"
+
+    price_tag = soup.find("div", {"class": "_30jeq3 _16Jk6d"})
+    price = price_tag.text.strip() if price_tag else "N/A"
+
+    img_tag = soup.find("img", {"class": "_396cs4"})
+    image = img_tag["src"] if img_tag and img_tag.has_attr("src") else ""
+
+    return {"title": title, "price": price, "image": image}
 
 @app.post("/login")
 def login(data: LoginRequest):
@@ -102,7 +77,6 @@ def login(data: LoginRequest):
 @app.post("/favorite")
 def add_favorite(token: str, data: FavoriteRequest):
     email = verify_token(token)
-
     scraped = scrape_flipkart(data.url)
 
     cur.execute(
@@ -116,32 +90,17 @@ def add_favorite(token: str, data: FavoriteRequest):
 @app.get("/favorites")
 def get_favorites(token: str):
     email = verify_token(token)
-
-    cur.execute(
-        "SELECT url, title, price, image FROM favorites WHERE email = ?",
-        (email,)
-    )
+    cur.execute("SELECT url, title, price, image FROM favorites WHERE email = ?", (email,))
     rows = cur.fetchall()
 
-    results = []
-    for r in rows:
-        results.append({
-            "url": r[0],
-            "title": r[1],
-            "price": r[2],
-            "image": r[3],
-        })
-
-    return results
+    return [
+        {"url": r[0], "title": r[1], "price": r[2], "image": r[3]}
+        for r in rows
+    ]
 
 @app.delete("/favorite")
 def delete_favorite(token: str, url: str):
     email = verify_token(token)
-
-    cur.execute(
-        "DELETE FROM favorites WHERE email = ? AND url = ?",
-        (email, url)
-    )
+    cur.execute("DELETE FROM favorites WHERE email = ? AND url = ?", (email, url))
     conn.commit()
-
     return {"status": "deleted"}
