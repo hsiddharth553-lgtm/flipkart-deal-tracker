@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, HTTPException
+﻿from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import sqlite3
@@ -42,7 +42,7 @@ class LoginRequest(BaseModel):
     id_token: str
 
 class FavoriteRequest(BaseModel):
-    url: str   # <-- frontend sends { "url": "..." }
+    url: str  # frontend sends { "url": "..." }
 
 # Helpers
 def verify_token(token: str):
@@ -63,7 +63,10 @@ def scrape_flipkart(url: str):
         "Referer": "https://www.google.com/"
     }
 
-    r = requests.get(url, headers=headers, timeout=15)
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+    except Exception:
+        return {"title": "Unknown Product", "price": "N/A", "image": ""}
 
     if r.status_code != 200:
         return {"title": "Unknown Product", "price": "N/A", "image": ""}
@@ -101,8 +104,11 @@ def login(data: LoginRequest):
     return {"email": email}
 
 @app.post("/favorite")
-def add_favorite(token: str, data: FavoriteRequest):
+def add_favorite(token: str = Query(...), data: FavoriteRequest = None):
     email = verify_token(token)
+
+    if not data or not data.url:
+        raise HTTPException(status_code=400, detail="Missing url")
 
     scraped = scrape_flipkart(data.url)
 
