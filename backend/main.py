@@ -42,7 +42,7 @@ class LoginRequest(BaseModel):
     id_token: str
 
 class FavoriteRequest(BaseModel):
-    url: str   # <-- IMPORTANT: url, not product
+    url: str   # <-- frontend sends { "url": "..." }
 
 # Helpers
 def verify_token(token: str):
@@ -57,24 +57,42 @@ def verify_token(token: str):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def scrape_flipkart(url: str):
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers, timeout=10)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-IN,en;q=0.9",
+        "Referer": "https://www.google.com/"
+    }
+
+    r = requests.get(url, headers=headers, timeout=15)
 
     if r.status_code != 200:
-        raise HTTPException(status_code=400, detail="Failed to fetch product page")
+        return {"title": "Unknown Product", "price": "N/A", "image": ""}
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    title_tag = soup.find("span", {"class": "B_NuCI"})
-    title = title_tag.text.strip() if title_tag else "Unknown Product"
+    # Try multiple selectors (Flipkart changes often)
+    title = None
+    for sel in ["span.B_NuCI", "h1.yhB1nd", "h1._6EBuvT", "h1"]:
+        t = soup.select_one(sel)
+        if t and t.text.strip():
+            title = t.text.strip()
+            break
 
-    price_tag = soup.find("div", {"class": "_30jeq3 _16Jk6d"})
-    price = price_tag.text.strip() if price_tag else "N/A"
+    price = None
+    for sel in ["div._30jeq3._16Jk6d", "div.Nx9bqj", "div._25b18c", "div._16Jk6d"]:
+        p = soup.select_one(sel)
+        if p and p.text.strip():
+            price = p.text.strip()
+            break
 
-    img_tag = soup.find("img")
-    image = img_tag["src"] if img_tag and img_tag.has_attr("src") else ""
+    img = soup.select_one("img._396cs4, img._2r_T1I, img._53J4C-, img")
+    image = img["src"] if img and img.has_attr("src") else ""
 
-    return {"title": title, "price": price, "image": image}
+    return {
+        "title": title or "Unknown Product",
+        "price": price or "N/A",
+        "image": image
+    }
 
 # Routes
 @app.post("/login")
@@ -94,7 +112,7 @@ def add_favorite(token: str, data: FavoriteRequest):
     )
     conn.commit()
 
-    return {"status": "ok"}
+    return {"status": "ok", "product": scraped}
 
 @app.get("/favorites")
 def get_favorites(token: str):
