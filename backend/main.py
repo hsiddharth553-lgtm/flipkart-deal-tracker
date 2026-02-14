@@ -3,22 +3,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import sqlite3
 import os
-import requests
-from bs4 import BeautifulSoup
 
 # Google auth
 from google.oauth2 import id_token
 from google.auth.transport import requests as grequests
 
+# Scraping
+import requests
+from bs4 import BeautifulSoup
+
 app = FastAPI()
 
-# CORS (allow your GitHub Pages + local)
+# CORS (allow GitHub Pages + local)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://hsiddharth553-lgtm.github.io",
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
+        "http://localhost:8001",
+        "http://127.0.0.1:8001",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -37,11 +39,10 @@ cur = conn.cursor()
 cur.execute("""
 CREATE TABLE IF NOT EXISTS favorites (
     email TEXT,
-    title TEXT,
     url TEXT,
-    image TEXT,
+    title TEXT,
     price TEXT,
-    mrp TEXT
+    image TEXT
 )
 """)
 conn.commit()
@@ -58,7 +59,7 @@ def scrape_flipkart(url: str):
     headers = {
         "User-Agent": "Mozilla/5.0"
     }
-    r = requests.get(url, headers=headers, timeout=15)
+    r = requests.get(url, headers=headers, timeout=10)
     if r.status_code != 200:
         raise Exception("Failed to fetch product page")
 
@@ -66,26 +67,20 @@ def scrape_flipkart(url: str):
 
     # Title
     title_tag = soup.find("span", {"class": "B_NuCI"})
-    title = title_tag.get_text(strip=True) if title_tag else "Unknown Product"
+    title = title_tag.text.strip() if title_tag else "Unknown Product"
+
+    # Price
+    price_tag = soup.find("div", {"class": "_30jeq3 _16Jk6d"})
+    price = price_tag.text.strip() if price_tag else "N/A"
 
     # Image
     img_tag = soup.find("img", {"class": "_396cs4"})
     image = img_tag["src"] if img_tag and img_tag.has_attr("src") else ""
 
-    # Price
-    price_tag = soup.find("div", {"class": "_30jeq3 _16Jk6d"})
-    price = price_tag.get_text(strip=True) if price_tag else "N/A"
-
-    # MRP
-    mrp_tag = soup.find("div", {"class": "_3I9_wc _2p6lqe"})
-    mrp = mrp_tag.get_text(strip=True) if mrp_tag else ""
-
     return {
         "title": title,
-        "image": image,
         "price": price,
-        "mrp": mrp,
-        "url": url
+        "image": image
     }
 
 def verify_token(token: str):
@@ -110,40 +105,36 @@ def login(data: LoginRequest):
 def add_favorite(token: str, data: FavoriteRequest):
     email = verify_token(token)
 
-    if "flipkart.com" not in data.url:
-        raise HTTPException(status_code=400, detail="Only Flipkart links supported")
-
-    product = scrape_flipkart(data.url)
+    scraped = scrape_flipkart(data.url)
 
     cur.execute(
-        "INSERT INTO favorites (email, title, url, image, price, mrp) VALUES (?, ?, ?, ?, ?, ?)",
-        (email, product["title"], product["url"], product["image"], product["price"], product["mrp"])
+        "INSERT INTO favorites (email, url, title, price, image) VALUES (?, ?, ?, ?, ?)",
+        (email, data.url, scraped["title"], scraped["price"], scraped["image"])
     )
     conn.commit()
 
-    return {"status": "ok", "product": product}
+    return {"status": "ok"}
 
 @app.get("/favorites")
 def get_favorites(token: str):
     email = verify_token(token)
 
     cur.execute(
-        "SELECT title, url, image, price, mrp FROM favorites WHERE email = ?",
+        "SELECT url, title, price, image FROM favorites WHERE email = ?",
         (email,)
     )
     rows = cur.fetchall()
 
-    result = []
+    results = []
     for r in rows:
-        result.append({
-            "title": r[0],
-            "url": r[1],
-            "image": r[2],
-            "price": r[3],
-            "mrp": r[4],
+        results.append({
+            "url": r[0],
+            "title": r[1],
+            "price": r[2],
+            "image": r[3],
         })
 
-    return result
+    return results
 
 @app.delete("/favorite")
 def delete_favorite(token: str, url: str):
