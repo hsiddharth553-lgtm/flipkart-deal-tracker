@@ -5,16 +5,12 @@ body {
 }
 
 .topbar {
-    background: #2874f0;
-    color: white;
-    padding: 10px;
     display: flex;
     align-items: center;
-    gap: 15px;
-}
-
-.logo {
-    font-weight: bold;
+    padding: 10px;
+    background: #2874f0;
+    color: white;
+    gap: 10px;
 }
 
 .search-box {
@@ -28,17 +24,11 @@ body {
     }
 
     .search-box button {
-        padding: 8px 16px;
+        padding: 8px 12px;
         background: #ff9f00;
         border: none;
         cursor: pointer;
     }
-
-.user-area {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
 
 .container {
     padding: 20px;
@@ -54,7 +44,6 @@ body {
     background: white;
     padding: 10px;
     border-radius: 6px;
-    box-shadow: 0 0 5px rgba(0,0,0,0.1);
     text-align: center;
 }
 
@@ -72,12 +61,4 @@ body {
 .price {
     color: green;
     margin-bottom: 8px;
-}
-
-.actions button {
-    background: red;
-    color: white;
-    border: none;
-    padding: 6px 10px;
-    cursor: pointer;
 }

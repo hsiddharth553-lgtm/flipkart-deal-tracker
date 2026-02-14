@@ -2,19 +2,16 @@
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import sqlite3
-import os
 
-# Google auth
 from google.oauth2 import id_token
 from google.auth.transport import requests as grequests
 
-# Scraping
 import requests
 from bs4 import BeautifulSoup
 
 app = FastAPI()
 
-# CORS (TEMP: allow all)
+# CORS (allow all for now)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,7 +20,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ===== CONFIG =====
 GOOGLE_CLIENT_ID = "996613039990-0trnr1a3dh4l5aevo57hci9v4mnc1ock.apps.googleusercontent.com"
 
 # ===== DATABASE =====
@@ -69,15 +65,12 @@ def scrape_flipkart(url: str):
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # Title
     title_tag = soup.find("span", {"class": "B_NuCI"})
     title = title_tag.text.strip() if title_tag else "Unknown Product"
 
-    # Price
     price_tag = soup.find("div", {"class": "_30jeq3 _16Jk6d"})
     price = price_tag.text.strip() if price_tag else "N/A"
 
-    # Image
     img_tag = soup.find("img", {"class": "_396cs4"})
     image = img_tag["src"] if img_tag and img_tag.has_attr("src") else ""
 
