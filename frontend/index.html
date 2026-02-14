@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Flipkart Deal Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Google Sign-In -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="logo">🛒 Flipkart Deal Tracker</div>
+
+    <div class="search-box">
+      <input id="product" placeholder="Search for products, brands and more..." />
+      <button onclick="addFavorite()">Add</button>
+    </div>
+
+    <div class="user-area">
+      <span id="userInfo">Not logged in</span>
+      <div id="g_id_onload"
+           data-client_id="996613039990-0trnr1a3dh4l5aevo57hci9v4mnc1ock.apps.googleusercontent.com"
+           data-callback="handleLogin">
+      </div>
+      <div class="g_id_signin"></div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <h2>Your Favorites</h2>
+    <div id="favGrid" class="grid"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
