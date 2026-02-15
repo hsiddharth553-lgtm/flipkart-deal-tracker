@@ -11,7 +11,11 @@ from bs4 import BeautifulSoup
 
 app = FastAPI()
 
-# CORS (allow all for now)
+# ================== CONFIG ==================
+GOOGLE_CLIENT_ID = "996613039990-0trnr1a3dh4l5aevo57hci9v4mnc1ock.apps.googleusercontent.com"
+SCRAPER_API_KEY = "a4daee406faf33361f2ac17e8e9268b8"  # 🔴 PUT YOUR KEY HERE
+
+# ================== CORS ==================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,9 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-GOOGLE_CLIENT_ID = "996613039990-0trnr1a3dh4l5aevo57hci9v4mnc1ock.apps.googleusercontent.com"
-
-# Database
+# ================== DATABASE ==================
 conn = sqlite3.connect("app.db", check_same_thread=False)
 cur = conn.cursor()
 
@@ -37,14 +39,14 @@ CREATE TABLE IF NOT EXISTS favorites (
 """)
 conn.commit()
 
-# Models
+# ================== MODELS ==================
 class LoginRequest(BaseModel):
     id_token: str
 
 class FavoriteRequest(BaseModel):
-    url: str  # frontend sends { "url": "..." }
+    url: str
 
-# Helpers
+# ================== HELPERS ==================
 def verify_token(token: str):
     try:
         idinfo = id_token.verify_oauth2_token(
@@ -57,14 +59,17 @@ def verify_token(token: str):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def scrape_flipkart(url: str):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-IN,en;q=0.9",
-        "Referer": "https://www.google.com/"
+    api_url = "http://api.scraperapi.com/"
+
+    params = {
+        "api_key": SCRAPER_API_KEY,
+        "url": url,
+        "country_code": "in",
+        "render": "true"
     }
 
     try:
-        r = requests.get(url, headers=headers, timeout=15)
+        r = requests.get(api_url, params=params, timeout=30)
     except Exception:
         return {"title": "Unknown Product", "price": "N/A", "image": ""}
 
@@ -73,22 +78,24 @@ def scrape_flipkart(url: str):
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # Try multiple selectors (Flipkart changes often)
+    # ---- Title ----
     title = None
-    for sel in ["span.B_NuCI", "h1.yhB1nd", "h1._6EBuvT", "h1"]:
+    for sel in ["span.B_NuCI", "h1", "h1.yhB1nd"]:
         t = soup.select_one(sel)
         if t and t.text.strip():
             title = t.text.strip()
             break
 
+    # ---- Price ----
     price = None
-    for sel in ["div._30jeq3._16Jk6d", "div.Nx9bqj", "div._25b18c", "div._16Jk6d"]:
+    for sel in ["div._30jeq3._16Jk6d", "div.Nx9bqj", "div._16Jk6d"]:
         p = soup.select_one(sel)
         if p and p.text.strip():
             price = p.text.strip()
             break
 
-    img = soup.select_one("img._396cs4, img._2r_T1I, img._53J4C-, img")
+    # ---- Image ----
+    img = soup.select_one("img")
     image = img["src"] if img and img.has_attr("src") else ""
 
     return {
@@ -97,7 +104,7 @@ def scrape_flipkart(url: str):
         "image": image
     }
 
-# Routes
+# ================== ROUTES ==================
 @app.post("/login")
 def login(data: LoginRequest):
     email = verify_token(data.id_token)
