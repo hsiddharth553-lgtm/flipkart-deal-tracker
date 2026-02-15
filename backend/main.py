@@ -13,7 +13,7 @@ app = FastAPI()
 
 # ================== CONFIG ==================
 GOOGLE_CLIENT_ID = "996613039990-0trnr1a3dh4l5aevo57hci9v4mnc1ock.apps.googleusercontent.com"
-SCRAPER_API_KEY = "a4daee406faf33361f2ac17e8e9268b8"  # 🔴 PUT YOUR KEY HERE
+SCRAPER_API_KEY = "a4daee406faf33361f2ac17e8e9268b8"  # ⚠️ Regenerate later for security
 
 # ================== CORS ==================
 app.add_middleware(
@@ -78,25 +78,30 @@ def scrape_flipkart(url: str):
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # ---- Title ----
+    # ✅ Title from OpenGraph (most reliable)
     title = None
-    for sel in ["span.B_NuCI", "h1", "h1.yhB1nd"]:
-        t = soup.select_one(sel)
-        if t and t.text.strip():
-            title = t.text.strip()
-            break
+    og_title = soup.select_one('meta[property="og:title"]')
+    if og_title and og_title.get("content"):
+        title = og_title["content"].strip()
 
-    # ---- Price ----
+    # ✅ Image from OpenGraph
+    image = ""
+    og_image = soup.select_one('meta[property="og:image"]')
+    if og_image and og_image.get("content"):
+        image = og_image["content"].strip()
+
+    # ✅ Price from OpenGraph or fallback selectors
     price = None
-    for sel in ["div._30jeq3._16Jk6d", "div.Nx9bqj", "div._16Jk6d"]:
-        p = soup.select_one(sel)
-        if p and p.text.strip():
-            price = p.text.strip()
-            break
+    og_price = soup.select_one('meta[property="product:price:amount"]')
+    if og_price and og_price.get("content"):
+        price = "₹" + og_price["content"].strip()
 
-    # ---- Image ----
-    img = soup.select_one("img")
-    image = img["src"] if img and img.has_attr("src") else ""
+    if not price:
+        for sel in ["div._30jeq3", "div.Nx9bqj", "span._30jeq3"]:
+            p = soup.select_one(sel)
+            if p and p.text.strip():
+                price = p.text.strip()
+                break
 
     return {
         "title": title or "Unknown Product",
