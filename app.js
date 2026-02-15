@@ -48,7 +48,7 @@ function addFavorite() {
   fetch(`${API_BASE}/favorite?token=${encodeURIComponent(idToken)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: url })   // <-- IMPORTANT: url
+    body: JSON.stringify({ url: url })
   })
     .then(res => {
       if (!res.ok) throw new Error("Add failed");
@@ -78,9 +78,10 @@ function loadFavorites() {
 function removeFavorite(url) {
   if (!idToken) return;
 
-  fetch(`${API_BASE}/favorite?token=${encodeURIComponent(idToken)}&url=${encodeURIComponent(url)}`, {
-    method: "DELETE"
-  })
+  fetch(
+    `${API_BASE}/favorite?token=${encodeURIComponent(idToken)}&url=${encodeURIComponent(url)}`,
+    { method: "DELETE" }
+  )
     .then(res => {
       if (!res.ok) throw new Error("Delete failed");
       return res.json();
@@ -111,7 +112,7 @@ function renderFavorites(list) {
       <div class="price">${item.price}</div>
       <a href="${item.url}" target="_blank">View on Flipkart</a>
       <div class="actions">
-        <button onclick="removeFavorite(${JSON.stringify(item.url)})">Remove</button>
+        <button onclick='removeFavorite("${item.url}")'>Remove</button>
       </div>
     `;
 
